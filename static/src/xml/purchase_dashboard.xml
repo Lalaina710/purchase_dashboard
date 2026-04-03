@@ -169,7 +169,7 @@
                                 <span class="float-end text-muted" style="font-size:0.85rem;">
                                     <t t-esc="state.filters.recent_days"/>j:
                                     <strong t-esc="state.data.recent_total_count"/> cmd
-                                    / <strong t-esc="formatAmount(state.data.recent_total_amount)"/> DH
+                                    / <strong t-esc="formatAmount(state.data.recent_total_amount)"/>
                                 </span>
                             </div>
                             <div class="chart-container">
@@ -211,7 +211,7 @@
                                                 <td t-esc="supplier.name"/>
                                                 <td t-esc="supplier.count"/>
                                                 <td>
-                                                    <strong t-esc="formatAmount(supplier.amount)"/> DH
+                                                    <strong t-esc="formatAmount(supplier.amount)"/>
                                                 </td>
                                             </tr>
                                         </t>

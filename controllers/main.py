@@ -142,7 +142,15 @@ class PurchaseDashboardController(http.Controller):
         # Config pour le frontend
         config = request.env['purchase.dashboard.config'].get_config()
 
+        # Devise de la société
+        currency = request.env.company.currency_id
+        currency_info = {
+            'symbol': currency.symbol or '',
+            'position': currency.position or 'after',
+        }
+
         return {
+            'currency': currency_info,
             'state_counts': state_counts,
             'late_count': late_count,
             'month_total': round(month_total, 2),
