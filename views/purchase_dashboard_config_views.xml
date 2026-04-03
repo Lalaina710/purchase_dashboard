@@ -48,5 +48,5 @@
         parent="purchase.menu_purchase_config"
         action="action_purchase_dashboard_config"
         sequence="100"
-        groups="purchase.group_purchase_manager"/>
+        groups="purchase_dashboard.group_purchase_dashboard_manager"/>
 </odoo>

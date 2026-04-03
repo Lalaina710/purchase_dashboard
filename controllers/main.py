@@ -1,12 +1,15 @@
 from odoo import http
 from odoo.http import request
 from datetime import datetime, timedelta
+from werkzeug.exceptions import Forbidden
 
 
 class PurchaseDashboardController(http.Controller):
 
     @http.route('/purchase_dashboard/data', type='json', auth='user')
     def get_dashboard_data(self, **kwargs):
+        if not request.env.user.has_group('purchase_dashboard.group_purchase_dashboard_user'):
+            raise Forbidden("Accès non autorisé au dashboard achat")
         PO = request.env['purchase.order']
 
         # Récupérer les paramètres dynamiques (filtres du frontend)
@@ -154,6 +157,8 @@ class PurchaseDashboardController(http.Controller):
     @http.route('/purchase_dashboard/filters_data', type='json', auth='user')
     def get_filters_data(self):
         """Retourne les données pour les listes déroulantes des filtres."""
+        if not request.env.user.has_group('purchase_dashboard.group_purchase_dashboard_user'):
+            raise Forbidden("Accès non autorisé au dashboard achat")
         # Acheteurs/responsables ayant des commandes
         users = request.env['purchase.order'].read_group(
             [('user_id', '!=', False)],

@@ -7,6 +7,7 @@
     'author': 'SOPROMER',
     'depends': ['purchase'],
     'data': [
+        'security/purchase_dashboard_groups.xml',
         'security/ir.model.access.csv',
         'views/purchase_dashboard_config_views.xml',
         'views/purchase_dashboard_views.xml',

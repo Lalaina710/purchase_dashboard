@@ -10,5 +10,6 @@
         name="Tableau de bord"
         parent="purchase.menu_purchase_root"
         action="action_purchase_dashboard"
-        sequence="1"/>
+        sequence="1"
+        groups="purchase_dashboard.group_purchase_dashboard_user"/>
 </odoo>
