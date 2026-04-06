@@ -55,17 +55,37 @@ class PurchaseDashboardController(http.Controller):
                     late_count += 1
                     break
 
-        # Dépenses ce mois (montant total des commandes confirmées du mois en cours)
+        # Total BC Achat (toutes les commandes confirmées)
         today = datetime.now()
         month_start = today.replace(day=1, hour=0, minute=0, second=0).strftime('%Y-%m-%d %H:%M:%S')
-        month_orders = PO.search_read(
-            base_domain + [
-                ('state', '=', 'purchase'),
-                ('date_approve', '>=', month_start),
-            ],
-            fields=['amount_total'],
+        bc_domain = base_domain + date_domain + [
+            ('state', 'in', ['purchase', 'done']),
+        ]
+        month_orders = PO.search_read(bc_domain, fields=['amount_total'])
+        bc_month = sum(o['amount_total'] for o in month_orders)
+
+        # Facturation Achat ce mois : payé et non payé
+        Invoice = request.env['account.move']
+        invoice_domain = [
+            ('move_type', '=', 'in_invoice'),
+            ('state', '=', 'posted'),
+        ]
+        if date_from:
+            invoice_domain.append(('invoice_date', '>=', date_from))
+        else:
+            invoice_domain.append(('invoice_date', '>=', today.replace(day=1).strftime('%Y-%m-%d')))
+        if date_to:
+            invoice_domain.append(('invoice_date', '<=', date_to))
+        if responsible_id:
+            invoice_domain.append(('invoice_user_id', '=', responsible_id))
+        if partner_id:
+            invoice_domain.append(('partner_id', '=', partner_id))
+        purchase_invoices = Invoice.search_read(
+            invoice_domain,
+            fields=['amount_total', 'payment_state'],
         )
-        month_total = sum(o['amount_total'] for o in month_orders)
+        purchase_paid = sum(inv['amount_total'] for inv in purchase_invoices if inv['payment_state'] in ('paid', 'in_payment'))
+        purchase_unpaid = sum(inv['amount_total'] for inv in purchase_invoices if inv['payment_state'] not in ('paid', 'in_payment'))
 
         # Montant achats par jour (N derniers jours - commandes confirmées par date_approve)
         daily_purchases = []
@@ -153,7 +173,12 @@ class PurchaseDashboardController(http.Controller):
             'currency': currency_info,
             'state_counts': state_counts,
             'late_count': late_count,
-            'month_total': round(month_total, 2),
+            'bc_month': round(bc_month, 2),
+            'invoice_purchase': {
+                'total': round(purchase_paid + purchase_unpaid, 2),
+                'paid': round(purchase_paid, 2),
+                'unpaid': round(purchase_unpaid, 2),
+            },
             'daily_purchases': daily_purchases,
             'active_orders': active_orders,
             'recent_total_count': recent_total_count,

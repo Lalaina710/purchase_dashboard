@@ -4,7 +4,7 @@
     'category': 'Inventory/Purchase',
     'summary': 'Dashboard Achats dynamique avec KPI, filtres et configuration',
     'description': 'Tableau de bord interactif pour le suivi des achats avec filtres dynamiques, rafraîchissement auto et configuration.',
-    'author': 'SOPROMER',
+    'author': 'MadaWebZone MWZ',
     'depends': ['purchase'],
     'data': [
         'security/purchase_dashboard_groups.xml',

@@ -93,7 +93,8 @@ class PurchaseDashboard extends Component {
             this.state.data = {
                 state_counts: {},
                 late_count: 0,
-                month_total: 0,
+                bc_month: 0,
+                invoice_purchase: { total: 0, paid: 0, unpaid: 0 },
                 daily_purchases: [],
                 active_orders: [],
                 recent_total_count: 0,
