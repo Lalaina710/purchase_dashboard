@@ -92,13 +92,15 @@ class PurchaseDashboardController(http.Controller):
         pchart_groups = PO.read_group(pchart_domain, fields=['amount_total:sum', 'date_approve'], groupby=['date_approve:day'])
         pchart_by_date = {}
         for g in pchart_groups:
-            dk = g.get('date_approve:day', '')
-            if dk:
+            rng = g.get('__range', {}).get('date_approve:day', {})
+            from_str = rng.get('from', '')
+            if from_str:
+                dk = from_str[:10]
                 pchart_by_date[dk] = {'amount': round(g.get('amount_total', 0), 2), 'count': g.get('__count', 0)}
         daily_purchases = []
         for i in range(chart_days - 1, -1, -1):
             day = pnow - timedelta(days=i)
-            day_key = day.strftime('%d %b %Y')
+            day_key = day.strftime('%Y-%m-%d')
             data = pchart_by_date.get(day_key, {})
             daily_purchases.append({
                 'date': day.strftime('%d/%m'),
