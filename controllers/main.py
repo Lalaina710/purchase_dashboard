@@ -1,6 +1,7 @@
-from odoo import http
+# Modified by: odoo-backend agent — 2026-04-13 — Fix late_count perf, bc_month, timezone
+from odoo import fields, http
 from odoo.http import request
-from datetime import datetime, timedelta
+from datetime import timedelta
 from werkzeug.exceptions import Forbidden
 
 
@@ -43,26 +44,23 @@ class PurchaseDashboardController(http.Controller):
             domain = base_domain + date_domain + [('state', '=', state)]
             state_counts[state] = PO.search_count(domain)
 
-        # Commandes en retard (confirmées, date_planned passée, réception incomplète)
-        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        late_orders = PO.search(base_domain + [
+        # Commandes en retard (optimisé — un seul search_count)
+        now = fields.Datetime.now()
+        now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+        late_count = PO.search_count(base_domain + [
             ('state', '=', 'purchase'),
+            ('order_line.date_planned', '<', now_str),
         ])
-        late_count = 0
-        for order in late_orders:
-            for line in order.order_line:
-                if line.date_planned and line.date_planned < datetime.now() and line.qty_received < line.product_qty:
-                    late_count += 1
-                    break
 
-        # Total BC Achat (toutes les commandes confirmées)
-        today = datetime.now()
+        # Total BC Achat (mois en cours par défaut)
+        today = fields.Datetime.now()
         month_start = today.replace(day=1, hour=0, minute=0, second=0).strftime('%Y-%m-%d %H:%M:%S')
-        bc_domain = base_domain + date_domain + [
+        bc_date_domain = date_domain if date_domain else [('date_order', '>=', month_start)]
+        bc_domain = base_domain + bc_date_domain + [
             ('state', 'in', ['purchase', 'done']),
         ]
-        month_orders = PO.search_read(bc_domain, fields=['amount_total'])
-        bc_month = sum(o['amount_total'] for o in month_orders)
+        bc_groups = PO.read_group(bc_domain, fields=['amount_total:sum'], groupby=[])
+        bc_month = bc_groups[0].get('amount_total', 0) if bc_groups else 0
 
         # Facturation Achat ce mois : payé et non payé
         Invoice = request.env['account.move']
@@ -87,27 +85,29 @@ class PurchaseDashboardController(http.Controller):
         purchase_paid = sum(inv['amount_total'] for inv in purchase_invoices if inv['payment_state'] in ('paid', 'in_payment'))
         purchase_unpaid = sum(inv['amount_total'] for inv in purchase_invoices if inv['payment_state'] not in ('paid', 'in_payment'))
 
-        # Montant achats par jour (N derniers jours - commandes confirmées par date_approve)
+        # Montant achats par jour (optimisé read_group)
+        pnow = fields.Datetime.now()
+        pchart_start = (pnow - timedelta(days=chart_days - 1)).strftime('%Y-%m-%d 00:00:00')
+        pchart_domain = base_domain + [('state', '=', 'purchase'), ('date_approve', '>=', pchart_start)]
+        pchart_groups = PO.read_group(pchart_domain, fields=['amount_total:sum', 'date_approve'], groupby=['date_approve:day'])
+        pchart_by_date = {}
+        for g in pchart_groups:
+            dk = g.get('date_approve:day', '')
+            if dk:
+                pchart_by_date[dk] = {'amount': round(g.get('amount_total', 0), 2), 'count': g.get('__count', 0)}
         daily_purchases = []
         for i in range(chart_days - 1, -1, -1):
-            day = datetime.now() - timedelta(days=i)
-            day_start = day.replace(hour=0, minute=0, second=0).strftime('%Y-%m-%d %H:%M:%S')
-            day_end = day.replace(hour=23, minute=59, second=59).strftime('%Y-%m-%d %H:%M:%S')
-            domain = base_domain + [
-                ('state', '=', 'purchase'),
-                ('date_approve', '>=', day_start),
-                ('date_approve', '<=', day_end),
-            ]
-            orders = PO.search_read(domain, fields=['amount_total'])
-            amount = sum(o['amount_total'] for o in orders)
+            day = pnow - timedelta(days=i)
+            day_key = day.strftime('%d %b %Y')
+            data = pchart_by_date.get(day_key, {})
             daily_purchases.append({
                 'date': day.strftime('%d/%m'),
-                'amount': round(amount, 2),
-                'count': len(orders),
+                'amount': data.get('amount', 0),
+                'count': data.get('count', 0),
             })
 
         # Statistiques période récente
-        date_n_ago = datetime.now() - timedelta(days=recent_days)
+        date_n_ago = fields.Datetime.now() - timedelta(days=recent_days)
         recent_orders = PO.search_read(
             base_domain + [
                 ('state', '=', 'purchase'),
