@@ -1,7 +1,8 @@
 # Modified by: odoo-backend agent — 2026-04-13 — Fix late_count perf, bc_month, timezone
 from odoo import fields, http
 from odoo.http import request
-from datetime import timedelta
+from datetime import timedelta, datetime
+import pytz
 from werkzeug.exceptions import Forbidden
 
 
@@ -20,6 +21,15 @@ class PurchaseDashboardController(http.Controller):
         active_order_limit = filters.get('active_order_limit', 50)
         date_from = filters.get('date_from')
         date_to = filters.get('date_to')
+
+        # Convert date_from/date_to to UTC boundaries (user timezone)
+        _ftz = pytz.timezone(request.env.user.tz or 'Indian/Antananarivo')
+        if date_from and len(date_from) == 10:
+            _df_local = _ftz.localize(datetime.strptime(date_from, '%Y-%m-%d'))
+            date_from = _df_local.astimezone(pytz.utc).strftime('%Y-%m-%d %H:%M:%S')
+        if date_to and len(date_to) == 10:
+            _dt_local = _ftz.localize(datetime.strptime(date_to, '%Y-%m-%d').replace(hour=23, minute=59, second=59))
+            date_to = _dt_local.astimezone(pytz.utc).strftime('%Y-%m-%d %H:%M:%S')
         responsible_id = filters.get('responsible_id')
         partner_id = filters.get('partner_id')
 
@@ -90,16 +100,18 @@ class PurchaseDashboardController(http.Controller):
         pchart_start = (pnow - timedelta(days=chart_days - 1)).strftime('%Y-%m-%d 00:00:00')
         pchart_domain = base_domain + [('state', '=', 'purchase'), ('date_approve', '>=', pchart_start)]
         pchart_groups = PO.read_group(pchart_domain, fields=['amount_total:sum', 'date_approve'], groupby=['date_approve:day'])
+        user_tz = pytz.timezone(request.env.user.tz or 'Indian/Antananarivo')
         pchart_by_date = {}
         for g in pchart_groups:
             rng = g.get('__range', {}).get('date_approve:day', {})
             from_str = rng.get('from', '')
             if from_str:
-                dk = from_str[:10]
+                utc_dt = datetime.strptime(from_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=pytz.utc)
+                dk = utc_dt.astimezone(user_tz).strftime('%Y-%m-%d')
                 pchart_by_date[dk] = {'amount': round(g.get('amount_total', 0), 2), 'count': g.get('__count', 0)}
         daily_purchases = []
         for i in range(chart_days - 1, -1, -1):
-            day = pnow - timedelta(days=i)
+            day = pnow.replace(tzinfo=pytz.utc).astimezone(user_tz) - timedelta(days=i)
             day_key = day.strftime('%Y-%m-%d')
             data = pchart_by_date.get(day_key, {})
             daily_purchases.append({
