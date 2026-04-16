@@ -34,6 +34,8 @@ class PurchaseDashboard extends Component {
             autoRefreshInterval: 0,
             // Dernière mise à jour
             lastUpdate: '',
+            // Dark mode
+            darkMode: localStorage.getItem('purchase_dashboard_dark') === 'true',
         });
         this._refreshTimer = null;
 
@@ -123,6 +125,11 @@ class PurchaseDashboard extends Component {
 
     applyFilters() {
         this.loadData();
+    }
+
+    toggleTheme() {
+        this.state.darkMode = !this.state.darkMode;
+        localStorage.setItem('purchase_dashboard_dark', this.state.darkMode);
     }
 
     resetFilters() {
